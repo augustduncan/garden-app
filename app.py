@@ -6,7 +6,7 @@ import streamlit as st
 
 DB = Path("garden.db")
 
-# Build the database the first time the app runs (or after a restart wipes it)
+# Build the database the first time the app runs (or after a restart wipes it) (or the reset button !!)
 if not DB.exists():
     conn = sqlite3.connect(DB)
     conn.executescript("""
@@ -35,11 +35,20 @@ if not DB.exists():
 
 conn = sqlite3.connect(DB)
 
-st.title("Garden Beds")
+# foreign keys on -- this will not allow you to remove beds that have existing entries
+conn.execute('PRAGMA foreign_keys = ON') 
+
+st.title("garden beds :D ")
+
+# RESET: throw away garden.db so the app builds a fresh one
+if st.button("reset!"):
+    conn.close()
+    DB.unlink()
+    st.rerun()
 
 # READ: pick a bed, see its history
 crops = pd.read_sql_query("SELECT crop FROM bed ORDER BY crop", conn)["crop"]
-crop = st.selectbox("Pick a bed", crops)
+crop = st.selectbox("which bed?", crops)
 
 history = pd.read_sql_query(
     """
@@ -56,9 +65,9 @@ st.dataframe(history, hide_index=True)
 
 # CREATE: add a visit for this bed
 with st.form("add_visit"):
-    visit_date = st.date_input("Visit date")
-    status = st.selectbox("Status", ["seeded", "sprouting", "harvesting", "fallow", "failed"])
-    if st.form_submit_button("Add visit"):
+    visit_date = st.date_input("when?")
+    status = st.selectbox("status?", ["seeded", "sprouting", "harvesting", "fallow", "failed"])
+    if st.form_submit_button("add visit"):
         conn.execute(
             "INSERT INTO bed_log (bed_id, log_date, status) "
             "SELECT bed_id, ?, ? FROM bed WHERE crop = ?",
@@ -66,3 +75,25 @@ with st.form("add_visit"):
         )
         conn.commit()
         st.rerun()
+
+# UPDATE: fix the name of the bed we picked
+with st.form("fix_crop"):
+    new_crop = st.text_input("fix the name of this bed", value=crop)
+    if st.form_submit_button("update!"):
+        conn.execute("UPDATE bed SET crop = ? WHERE crop = ?", (new_crop, crop))
+        conn.commit()
+        st.rerun()
+
+
+
+# DELETE: remove the bed we picked
+with st.form("remove_bed"):
+    st.write("remove the selected bed")
+    if st.form_submit_button("REMOVE"):
+        try:
+            conn.execute("DELETE FROM bed WHERE crop = ?", (crop,))
+            conn.commit()
+            st.rerun()
+        except sqlite3.IntegrityError:
+            conn.rollback()
+            st.error(f"can't delete {crop}: it still has logs!")
