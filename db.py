@@ -2,6 +2,9 @@ import sqlite3
 
 import pandas as pd
 
+def connect():
+    conn = sqlite3.connect("garden.db")
+    return conn
 
 def crops(conn):
     return pd.read_sql_query("SELECT crop FROM bed ORDER BY crop", conn)["crop"]

@@ -1,7 +1,7 @@
 import streamlit as st
 
 import queries
-from db import connect, reset
+from db import connect
 
 conn = connect()
 
