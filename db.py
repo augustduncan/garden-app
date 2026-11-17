@@ -1,56 +1,43 @@
-import sqlite3
 
-import pandas as pd
+import sqlite3
+from pathlib import Path
+
+DB = Path("garden.db")
+
+SCHEMA = """
+    CREATE TABLE bed (
+        bed_id   INTEGER PRIMARY KEY,
+        crop     TEXT NOT NULL,
+        location TEXT
+    );
+    CREATE TABLE bed_log (
+        log_id   INTEGER PRIMARY KEY,
+        bed_id   INTEGER NOT NULL REFERENCES bed(bed_id),
+        log_date TEXT,
+        status   TEXT
+    );
+    INSERT INTO bed VALUES
+        (1, 'kale', 'upper garden'),
+        (2, 'garlic', 'hoop house'),
+        (3, 'tomatoes', 'lower garden');
+    INSERT INTO bed_log (bed_id, log_date, status) VALUES
+        (1, '2026-09-01', 'seeded'),
+        (1, '2026-09-20', 'sprouting'),
+        (2, '2026-09-05', 'seeded');
+"""
+
 
 def connect():
-    conn = sqlite3.connect("garden.db")
+    # Build the database the first time (or after a restart wipes it)
+    if not DB.exists():
+        build = sqlite3.connect(DB)
+        build.executescript(SCHEMA)
+        build.commit()
+        build.close()
+    conn = sqlite3.connect(DB)
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
-def crops(conn):
-    return pd.read_sql_query("SELECT crop FROM bed ORDER BY crop", conn)["crop"]
 
-
-def history(conn, crop):
-    return pd.read_sql_query(
-        """
-        SELECT l.log_date, l.status
-        FROM bed_log l
-        JOIN bed b ON b.bed_id = l.bed_id
-        WHERE b.crop = ?
-        ORDER BY l.log_date
-        """,
-        conn,
-        params=(crop,),
-    )
-
-
-def orphan_count(conn):
-    return pd.read_sql_query(
-        "SELECT COUNT(*) AS n FROM bed_log WHERE bed_id NOT IN (SELECT bed_id FROM bed)",
-        conn,
-    )["n"][0]
-
-
-def add_visit(conn, crop, visit_date, status):
-    conn.execute(
-        "INSERT INTO bed_log (bed_id, log_date, status) "
-        "SELECT bed_id, ?, ? FROM bed WHERE crop = ?",
-        (str(visit_date), status, crop),
-    )
-    conn.commit()
-
-
-def fix_crop(conn, old, new):
-    conn.execute("UPDATE bed SET crop = ? WHERE crop = ?", (new, old))
-    conn.commit()
-
-
-def remove_bed(conn, crop):
-    # True if the bed was removed, False if it still has logs
-    try:
-        conn.execute("DELETE FROM bed WHERE crop = ?", (crop,))
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        conn.rollback()
-        return False
+def reset():
+    DB.unlink(missing_ok=True)
