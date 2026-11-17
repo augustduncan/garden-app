@@ -1,11 +1,11 @@
 import streamlit as st
 
 import queries
-from db import connect
+from db import connect, reset
 
 conn = connect()
 
-st.title("Garden Beds")
+st.title(":rainbow[Garden Beds]")
 st.write("Pick a page in the sidebar.")
 st.caption(f"Logs with no bed: {queries.orphan_count(conn)}")
 

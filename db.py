@@ -35,7 +35,8 @@ def connect():
         build.commit()
         build.close()
     conn = sqlite3.connect(DB)
-    conn.execute("PRAGMA foreign_keys = ON")
+    # conn.execute("PRAGMA foreign_keys = ON")
+    # foriegn keys are going to be OFF just so there actually can be logs with no bed 
     return conn
 
 
